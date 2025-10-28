@@ -4,6 +4,11 @@ import duckdb
 import requests
 from io import BytesIO
 
+API_URL = "http://localhost:8000"
+
+def get_file_for_api(uploaded_file):
+    return {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+
 st.set_page_config(page_title="Databotics", layout="wide")
 st.title("Databotics – Spellcheck for Data")
 
@@ -43,20 +48,34 @@ if uploaded_files:
                 st.dataframe(res.head(1000))
             except Exception as e:
                 st.error(str(e))
-        st.write("### Validate")
+        st.write("### Validate & Analyze")
         col_rules = st.text_area("Rules (YAML)", "required: []\nunique: []")
-        if st.button("Run Validation"):
-            f0 = uploaded_files[0]
-            files = {'file': (f0.name, f0.getvalue(), f0.type)}
-            try:
-                r = requests.post("http://localhost:8000/validate", files=files, json={"rules": {}})
-                rep = r.json()
-                if rep.get("ok"):
-                    st.success("No issues found ✅")
-                else:
-                    st.write(rep.get("issues"))
-            except Exception as e:
-                st.error(str(e))
+
+        val_col, anal_col = st.columns(2)
+
+        with val_col:
+            if st.button("Run Validation"):
+                files = get_file_for_api(uploaded_files[0])
+                try:
+                    r = requests.post(f"{API_URL}/validate", files=files, json={"rules": {}})
+                    rep = r.json()
+                    if rep.get("ok"):
+                        st.success("No issues found ✅")
+                    else:
+                        st.write(rep.get("issues"))
+                except Exception as e:
+                    st.error(str(e))
+
+        with anal_col:
+            if st.button("Analyze with AI"):
+                files = get_file_for_api(uploaded_files[0])
+                try:
+                    r = requests.post(f"{API_URL}/analyze", files=files)
+                    rep = r.json()
+                    st.write("### AI Analysis Results")
+                    st.write(rep.get("analysis"))
+                except Exception as e:
+                    st.error(str(e))
     with col_right:
         st.write("### AI SQL Helper")
         nl_question = st.text_input("Describe the query you want (English)")
