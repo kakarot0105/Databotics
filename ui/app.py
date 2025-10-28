@@ -3,25 +3,42 @@ import pandas as pd
 import duckdb
 import requests
 from io import BytesIO
-import altair as alt
+import plotly.express as px
 
 API_URL = "http://localhost:8000"
 
 def get_file_for_api(uploaded_file):
     return {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
 
+def load_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
 st.set_page_config(page_title="Databotics", layout="wide")
-st.title("Databotics – Spellcheck for Data")
+load_css("/Users/nikhilnarahari/Documents/GitHub/Databotics/ui/style.css")
 
-uploaded_files = st.file_uploader("Drop CSV/XLSX files", type=["csv","xlsx","xls"], accept_multiple_files=True)
+# --- Hero Section ---
+with st.container():
+    st.markdown("<div class='hero fade-in'>", unsafe_allow_html=True)
+    st.image("/Users/nikhilnarahari/Documents/GitHub/Databotics/ui/assets/logo.svg", width=100)
+    st.markdown("<h1 class='logo'>Databotics</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='tagline'>Your AI Data Guardian</p>", unsafe_allow_html=True)
+    if st.button("Try Now"):
+        pass # Add action for the button
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- Main App ---
+with st.container():
+    st.markdown("<div class='card slide-in-up'>", unsafe_allow_html=True)
+    uploaded_files = st.file_uploader("Drop CSV/XLSX files", type=["csv","xlsx","xls"], accept_multiple_files=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
 con = duckdb.connect(database=':memory:')
-
 dataframes = {}
 
 if uploaded_files:
     for f in uploaded_files:
         raw = f.read()
-        # Use header=0 to ensure first row is header
         if f.name.endswith(("xlsx","xls")):
             df = pd.read_excel(BytesIO(raw), header=0)
         else:
@@ -31,93 +48,37 @@ if uploaded_files:
         dataframes[table] = df
         st.success(f"Registered table: `{table}` ({df.shape[0]} rows)")
 
-    st.subheader("Query and Validate")
-    # Create columns: left for SQL query & validation, right for AI helper
+    st.markdown("<div class='card slide-in-up'>", unsafe_allow_html=True)
+    st.subheader("Query Console")
     col_left, col_right = st.columns([2, 1])
     with col_left:
-        st.write("### Query your files")
+        st.markdown("<div class='query-console'>", unsafe_allow_html=True)
         tables_df = con.execute("SHOW TABLES").fetchdf()
         default_query = ""
         if len(tables_df) > 0:
             default_query = f"SELECT * FROM {tables_df.iloc[0,0]} LIMIT 10;"
         if "sql_text" not in st.session_state:
             st.session_state["sql_text"] = default_query
-        st.text_area("SQL", key="sql_text", height=120)
+        st.text_area("SQL", key="sql_text", height=150)
+        st.markdown("<span class='ai-assist-icon'>✨</span>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         if st.button("Run SQL"):
             try:
                 res = con.execute(st.session_state["sql_text"]).fetchdf()
                 st.dataframe(res.head(1000))
             except Exception as e:
                 st.error(str(e))
-        st.write("### Validate & Analyze")
-        col_rules = st.text_area("Rules (YAML)", "required: []\nunique: []")
-
-        val_col, anal_col = st.columns(2)
-
-        with val_col:
-            if st.button("Run Validation"):
-                files = get_file_for_api(uploaded_files[0])
-                try:
-                    r = requests.post(f"{API_URL}/validate", files=files, json={"rules": {}})
-                    rep = r.json()
-                    if rep.get("ok"):
-                        st.success("No issues found ✅")
-                    else:
-                        st.write(rep.get("issues"))
-                except Exception as e:
-                    st.error(str(e))
-
-        with anal_col:
-            if st.button("Analyze with AI"):
-                files = get_file_for_api(uploaded_files[0])
-                try:
-                    r = requests.post(f"{API_URL}/analyze", files=files)
-                    rep = r.json()
-                    st.write("### AI Analysis Results")
-                    st.write(rep.get("analysis"))
-                except Exception as e:
-                    st.error(str(e))
-
-    st.subheader("Visualize Data")
-    if dataframes:
-        first_table_name = list(dataframes.keys())[0]
-        df_to_visualize = dataframes[first_table_name]
-
-        columns = [""] + df_to_visualize.columns.tolist()
-        selected_column = st.selectbox("Select a column to visualize", columns)
-
-        if selected_column:
-            dtype = df_to_visualize[selected_column].dtype
-            if pd.api.types.is_numeric_dtype(dtype):
-                # Histogram for numerical data
-                chart = alt.Chart(df_to_visualize).mark_bar().encode(
-                    alt.X(selected_column, bin=True),
-                    y='count()',
-                ).properties(
-                    title=f'Histogram of {selected_column}'
-                )
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                # Bar chart for categorical data
-                chart = alt.Chart(df_to_visualize).mark_bar().encode(
-                    x=alt.X(selected_column, sort='-y'),
-                    y='count()',
-                ).properties(
-                    title=f'Bar Chart of {selected_column}'
-                )
-                st.altair_chart(chart, use_container_width=True)
 
     with col_right:
         st.write("### AI SQL Helper")
         nl_question = st.text_input("Describe the query you want (English)")
         if st.button("Generate SQL with AI"):
             if nl_question:
-                # build schema dict for tables
                 schemas = {}
                 for t_name, df in dataframes.items():
                     schemas[t_name] = {col: str(dtype) for col, dtype in df.dtypes.items()}
                 try:
-                    resp = requests.post("http://localhost:8000/generate_sql", json={"question": nl_question, "tables": schemas})
+                    resp = requests.post(f"{API_URL}/generate_sql", json={"question": nl_question, "tables": schemas})
                     if resp.ok:
                         gen_sql = resp.json().get("sql")
                         if gen_sql:
@@ -130,3 +91,49 @@ if uploaded_files:
                         st.error(f"Error: {resp.status_code}")
                 except Exception as e:
                     st.error(str(e))
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- Visualization Dashboard ---
+    st.markdown("<div class='card slide-in-up'>", unsafe_allow_html=True)
+    st.subheader("Visualization Dashboard")
+    if not dataframes:
+        st.info("Upload a file to see visualizations.")
+    else:
+        # Create a sample chart
+        first_df_name = list(dataframes.keys())[0]
+        first_df = dataframes[first_df_name]
+        if len(first_df.columns) > 1:
+            try:
+                fig = px.scatter(first_df, x=first_df.columns[0], y=first_df.columns[1], title=f"Sample Plot of {first_df_name}")
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Could not generate a plot: {e}")
+        else:
+            st.info("Not enough columns to create a plot.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- Database Connectors ---
+st.markdown("<div class='card slide-in-up'>", unsafe_allow_html=True)
+st.subheader("Database Connectors")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown("<div class='connector-card'>", unsafe_allow_html=True)
+    st.image("/Users/nikhilnarahari/Documents/GitHub/Databotics/ui/assets/postgresql.svg", width=64)
+    st.write("PostgreSQL")
+    st.markdown("</div>", unsafe_allow_html=True)
+with col2:
+    st.markdown("<div class='connector-card'>", unsafe_allow_html=True)
+    st.image("/Users/nikhilnarahari/Documents/GitHub/Databotics/ui/assets/mysql.svg", width=64)
+    st.write("MySQL")
+    st.markdown("</div>", unsafe_allow_html=True)
+with col3:
+    st.markdown("<div class='connector-card'>", unsafe_allow_html=True)
+    st.image("/Users/nikhilnarahari/Documents/GitHub/Databotics/ui/assets/snowflake.svg", width=64)
+    st.write("Snowflake")
+    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+# --- Footer ---
+st.markdown("<div class='footer'>", unsafe_allow_html=True)
+st.write("© 2025 Databotics. All rights reserved.")
+st.markdown("</div>", unsafe_allow_html=True)

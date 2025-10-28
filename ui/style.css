@@ -1,0 +1,164 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+:root {
+    --primary-font: 'Poppins', sans-serif;
+    --gradient-start: #0d1a26;
+    --gradient-end: #1a3a52;
+    --accent-blue: #00aaff;
+    --accent-purple: #8a2be2;
+    --accent-cyan: #00c5c7;
+    --text-color: #ffffff;
+    --card-bg-color: rgba(255, 255, 255, 0.05);
+    --card-border-color: rgba(255, 255, 255, 0.2);
+    --shadow-color: rgba(0, 0, 0, 0.2);
+    --glow-color: var(--accent-cyan);
+}
+
+body {
+    font-family: var(--primary-font);
+    color: var(--text-color);
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+}
+
+/* --- General Element Styling --- */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* --- Hero Section --- */
+.hero {
+    text-align: center;
+    padding: 4rem 1rem;
+}
+
+.hero .logo {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--text-color);
+    text-shadow: 0 0 10px var(--accent-blue);
+}
+
+.hero .tagline {
+    font-size: 1.5rem;
+    font-weight: 300;
+    margin-top: -10px;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+/* --- Custom Cards --- */
+.card {
+    background-color: var(--card-bg-color);
+    border-radius: 15px;
+    padding: 2rem;
+    border: 1px solid var(--card-border-color);
+    box-shadow: 0 8px 32px 0 var(--shadow-color);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* --- Query Console --- */
+.query-console {
+    position: relative;
+}
+
+.query-console textarea {
+    background-color: #0d1117 !important;
+    color: #c9d1d9 !important;
+    border: 1px solid var(--card-border-color) !important;
+    border-radius: 8px !important;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    box-shadow: 0 0 15px rgba(0, 170, 255, 0.2);
+}
+
+.ai-assist-icon {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 1.5rem;
+    color: var(--accent-cyan);
+    cursor: pointer;
+    animation: glow 1.5s infinite alternate;
+}
+
+@keyframes glow {
+    from {
+        text-shadow: 0 0 5px var(--glow-color), 0 0 10px var(--glow-color);
+    }
+    to {
+        text-shadow: 0 0 20px var(--glow-color), 0 0 30px var(--glow-color);
+    }
+}
+
+/* --- Connector Cards --- */
+.connector-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.connector-card img {
+    height: 64px;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 0 5px var(--accent-blue));
+}
+
+/* --- Footer --- */
+.footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    margin-top: 4rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+}
+
+/* --- Animations --- */
+.fade-in {
+    animation: fadeIn 1s ease-in-out;
+}
+
+.slide-in-up {
+    animation: slideInUp 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* --- Streamlit Specific Overrides --- */
+.stButton > button {
+    border: 2px solid var(--accent-cyan);
+    border-radius: 25px;
+    color: var(--accent-cyan);
+    background-color: transparent;
+    padding: 10px 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-color: var(--accent-cyan);
+    color: #fff;
+    box-shadow: 0 0 15px var(--accent-cyan);
+}
+
+.stTextInput, .stTextArea {
+    border-radius: 8px;
+}
