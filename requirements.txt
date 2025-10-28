@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+streamlit
+pandas
+duckdb
+requests
+snowflake-connector-python
+pydantic
