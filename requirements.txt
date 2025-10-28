@@ -6,3 +6,5 @@ duckdb
 requests
 snowflake-connector-python
 pydantic
+
+openai
