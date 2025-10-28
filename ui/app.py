@@ -3,6 +3,7 @@ import pandas as pd
 import duckdb
 import requests
 from io import BytesIO
+import altair as alt
 
 API_URL = "http://localhost:8000"
 
@@ -76,6 +77,36 @@ if uploaded_files:
                     st.write(rep.get("analysis"))
                 except Exception as e:
                     st.error(str(e))
+
+    st.subheader("Visualize Data")
+    if dataframes:
+        first_table_name = list(dataframes.keys())[0]
+        df_to_visualize = dataframes[first_table_name]
+
+        columns = [""] + df_to_visualize.columns.tolist()
+        selected_column = st.selectbox("Select a column to visualize", columns)
+
+        if selected_column:
+            dtype = df_to_visualize[selected_column].dtype
+            if pd.api.types.is_numeric_dtype(dtype):
+                # Histogram for numerical data
+                chart = alt.Chart(df_to_visualize).mark_bar().encode(
+                    alt.X(selected_column, bin=True),
+                    y='count()',
+                ).properties(
+                    title=f'Histogram of {selected_column}'
+                )
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                # Bar chart for categorical data
+                chart = alt.Chart(df_to_visualize).mark_bar().encode(
+                    x=alt.X(selected_column, sort='-y'),
+                    y='count()',
+                ).properties(
+                    title=f'Bar Chart of {selected_column}'
+                )
+                st.altair_chart(chart, use_container_width=True)
+
     with col_right:
         st.write("### AI SQL Helper")
         nl_question = st.text_input("Describe the query you want (English)")
