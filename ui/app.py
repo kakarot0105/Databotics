@@ -70,9 +70,9 @@ if uploaded_files:
                 st.error(str(e))
 
     with col_right:
-        st.write("### AI SQL Helper")
+        st.write("### Databotics AI")
         nl_question = st.text_input("Describe the query you want (English)")
-        if st.button("Generate SQL with AI"):
+        if st.button("Databotics AI"):
             if nl_question:
                 schemas = {}
                 for t_name, df in dataframes.items():
