@@ -1,0 +1,4 @@
+pycatcher
+scipy<1.14.0
+statsmodels==0.14.4
+numpy<2

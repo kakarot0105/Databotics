@@ -1,10 +1,13 @@
 fastapi
 uvicorn[standard]
 streamlit
+plotly
 pandas
 duckdb
 requests
 snowflake-connector-python
 pydantic
 
-openai
+openai<1
+psycopg2-binary
+pymysql
