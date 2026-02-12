@@ -7,4 +7,4 @@ columns:
     min: 0
     max: 120
   email:
-    regex: ".+@.+\..+"
+    regex: '^[^@\s]+@[^@\s]+\.[^@\s]+$'

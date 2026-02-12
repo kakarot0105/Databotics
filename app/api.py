@@ -1,21 +1,184 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 import pandas as pd
 from .validation import load_rules, validate_dataframe
 import io
+import json
+import math
 
-app = FastAPI()
+app = FastAPI(title="Databotics API")
 
-@app.post('/validate')
-async def validate(file: UploadFile = File(...), rules_path: str = 'rules/basic.yaml'):
-    contents = await file.read()
+# ---- Pydantic models ----
+class ColumnStats(BaseModel):
+    name: str
+    type: str
+    null_count: int
+    null_pct: float
+    stats: Optional[Dict[str, Any]] = None
+
+class ProfileResponse(BaseModel):
+    dataset_id: Optional[str]
+    filename: Optional[str]
+    row_count: int
+    columns: List[ColumnStats]
+    sample_rows: List[Dict[str, Any]]
+    warnings: List[str] = []
+
+class ValidateResponse(BaseModel):
+    dataset_id: Optional[str]
+    ruleset_id: Optional[str]
+    summary: Dict[str, Any]
+    violations: List[Dict[str, Any]]
+
+class GenerateSQLRequest(BaseModel):
+    question: str
+    table: str
+    schema: Dict[str, str]
+    sample_rows: Optional[List[Dict[str,Any]]] = None
+
+class GenerateSQLResponse(BaseModel):
+    sql: str
+    explanation: str
+    safety: Dict[str,Any]
+
+class AnalyzeRequest(BaseModel):
+    timestamp_col: str
+    metric_col: str
+    dimension_cols: Optional[List[str]] = None
+    method: Optional[str] = "simple"
+
+class AnalyzeResponse(BaseModel):
+    anomalies: List[Dict[str,Any]]
+    summary: Dict[str,Any]
+    narrative: str
+
+# ---- Helpers ----
+def _read_table_from_upload(contents: bytes) -> pd.DataFrame:
     try:
-        df = pd.read_csv(io.BytesIO(contents))
+        return pd.read_csv(io.BytesIO(contents))
     except Exception:
         try:
-            df = pd.read_excel(io.BytesIO(contents))
+            return pd.read_excel(io.BytesIO(contents))
         except Exception as e:
-            return JSONResponse({'error': str(e)}, status_code=400)
+            raise HTTPException(status_code=400, detail=str(e))
+
+# ---- Endpoints ----
+@app.post('/profile', response_model=ProfileResponse)
+async def profile(file: UploadFile = File(...)):
+    contents = await file.read()
+    df = _read_table_from_upload(contents)
+    cols = []
+    for c in df.columns:
+        null_count = int(df[c].isnull().sum())
+        null_pct = float(null_count) / max(1, len(df))
+        stats = None
+        if pd.api.types.is_numeric_dtype(df[c]):
+            stats = {
+                'min': float(df[c].min()),
+                'max': float(df[c].max()),
+                'mean': float(df[c].mean()) if not math.isnan(df[c].mean()) else None,
+                'std': float(df[c].std()) if not math.isnan(df[c].std()) else None,
+            }
+        cols.append(ColumnStats(name=str(c), type=str(df[c].dtype), null_count=null_count, null_pct=null_pct, stats=stats))
+    sample = df.head(20).to_dict(orient='records')
+    return ProfileResponse(dataset_id=None, filename=file.filename, row_count=len(df), columns=cols, sample_rows=sample)
+
+@app.post('/validate', response_model=ValidateResponse)
+async def validate(file: UploadFile = File(...), rules_path: str = 'ui/validation_rules/basic.yaml'):
+    contents = await file.read()
+    df = _read_table_from_upload(contents)
     rules = load_rules(rules_path)
     report = validate_dataframe(df, rules)
-    return report
+    # normalize output
+    return ValidateResponse(dataset_id=None, ruleset_id=None, summary=report.get('summary', {}), violations=report.get('errors', []))
+
+@app.post('/clean')
+async def clean(file: UploadFile = File(...), trim_strings: bool = True, normalize_case: Optional[str] = None, drop_duplicates: bool = False):
+    contents = await file.read()
+    df = _read_table_from_upload(contents)
+    before = len(df)
+    if trim_strings:
+        for c in df.select_dtypes(include=['object']).columns:
+            df[c] = df[c].apply(lambda v: v.strip() if isinstance(v, str) else v)
+    if normalize_case in ('lower','upper'):
+        for c in df.select_dtypes(include=['object']).columns:
+            if normalize_case == 'lower':
+                df[c] = df[c].apply(lambda v: v.lower() if isinstance(v, str) else v)
+            else:
+                df[c] = df[c].apply(lambda v: v.upper() if isinstance(v, str) else v)
+    if drop_duplicates:
+        df = df.drop_duplicates()
+    after = len(df)
+    # return parquet bytes if pyarrow available, else CSV
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        table = pa.Table.from_pandas(df)
+        buf = io.BytesIO()
+        pq.write_table(table, buf)
+        buf.seek(0)
+        return StreamingResponse(buf, media_type='application/octet-stream', headers={'Content-Disposition':'attachment; filename="cleaned.parquet"'})
+    except Exception:
+        buf = io.StringIO()
+        df.to_csv(buf, index=False)
+        buf.seek(0)
+        return StreamingResponse(io.BytesIO(buf.getvalue().encode('utf-8')), media_type='text/csv', headers={'Content-Disposition':'attachment; filename="cleaned.csv"'})
+
+@app.post('/generate_sql', response_model=GenerateSQLResponse)
+async def generate_sql(req: GenerateSQLRequest):
+    # deterministic fallback when no OPENAI_API_KEY
+    import os
+    key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+    if not key:
+        # simple rule-based generator
+        # support: SELECT columns WHERE conditions ORDER BY ... LIMIT n
+        col_list = ', '.join([f'"{k}"' for k in req.schema.keys()])
+        sql = f"SELECT {col_list} FROM {req.table} LIMIT 100;"
+        return GenerateSQLResponse(sql=sql, explanation='Fallback deterministic SQL: select top 100 rows', safety={'is_safe': True, 'reasons': []})
+    # if key exists, call LLM wrapper (mockable)
+    try:
+        from .llm import generate_sql as llm_generate_sql
+        sql, expl = llm_generate_sql(req.question, req.schema, req.sample_rows)
+        return GenerateSQLResponse(sql=sql, explanation=expl, safety={'is_safe': True, 'reasons': []})
+    except Exception:
+        # fallback
+        col_list = ', '.join([f'"{k}"' for k in req.schema.keys()])
+        sql = f"SELECT {col_list} FROM {req.table} LIMIT 100;"
+        return GenerateSQLResponse(sql=sql, explanation='Fallback deterministic SQL due to LLM error', safety={'is_safe': True, 'reasons': []})
+
+@app.post('/analyze', response_model=AnalyzeResponse)
+async def analyze(file: UploadFile = File(...), payload: AnalyzeRequest = None):
+    contents = await file.read()
+    df = _read_table_from_upload(contents)
+    req = payload
+    # simple fallback z-score detection
+    ts = pd.to_datetime(df[req.timestamp_col])
+    vals = pd.to_numeric(df[req.metric_col], errors='coerce')
+    mean = vals.mean()
+    std = vals.std()
+    anomalies = []
+    if std and std > 0:
+        z = (vals - mean) / std
+        outliers = z[abs(z) > 3]
+        for idx in outliers.index:
+            anomalies.append({'timestamp': str(ts.iloc[idx]), 'value': float(vals.iloc[idx]), 'score': float(z.iloc[idx])})
+    narrative = 'No LLM available; used z-score fallback.'
+    return AnalyzeResponse(anomalies=anomalies, summary={'count': len(anomalies), 'method_used': 'zscore'}, narrative=narrative)
+
+@app.post('/query')
+async def query(file: UploadFile = File(...), sql: str = ''):
+    contents = await file.read()
+    df = _read_table_from_upload(contents)
+    try:
+        import duckdb
+        con = duckdb.connect(database=':memory:')
+        # register dataframe as table
+        con.register('loaded_table', df)
+        res = con.execute(sql).fetchdf()
+        rows = res.to_dict(orient='records')
+        cols = list(res.columns)
+        return {'columns': cols, 'rows': rows, 'row_count': len(res)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

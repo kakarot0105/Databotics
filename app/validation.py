@@ -1,6 +1,8 @@
 from typing import List, Dict, Any
 import yaml
 import pandas as pd
+from pathlib import Path
+import pkgutil
 
 class RuleError:
     def __init__(self, column: str, message: str, row_sample: Dict[str, Any] | None = None):
@@ -8,13 +10,40 @@ class RuleError:
         self.message = message
         self.row_sample = row_sample
 
-    def to_dict(self):
-        return {"column": self.column, "message": self.message, "row_sample": self.row_sample}
+    def to_dict(self) -> Dict[str, Any]:
+        # Consistent dict shape for tests and JSON responses
+        return {
+            "column": str(self.column),
+            "message": str(self.message),
+            "row_sample": self.row_sample if self.row_sample is not None else {},
+        }
 
 
-def load_rules(path: str) -> Dict[str, Any]:
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+def load_rules(path: str | Path) -> Dict[str, Any]:
+    """
+    Load YAML rules. Accepts a filesystem path or a package-relative path
+    (e.g. 'ui/validation_rules/basic.yaml'). If the provided path is not
+    found on the filesystem, this function will attempt to resolve it
+    relative to the Databotics package root.
+    """
+    p = Path(path)
+    if not p.exists():
+        # try to resolve relative to the package root
+        pkg_root = Path(__file__).resolve().parents[1]  # Databotics/
+        candidate = pkg_root / Path(path)
+        if candidate.exists():
+            p = candidate
+    if p.exists():
+        with open(p, "r") as f:
+            return yaml.safe_load(f)
+    # last resort: try to load as package resource via pkgutil (embedded resources)
+    try:
+        data = pkgutil.get_data(__package__, str(path))
+        if data:
+            return yaml.safe_load(data.decode("utf-8"))
+    except Exception:
+        pass
+    raise FileNotFoundError(f"Rules file not found: {path}")
 
 
 def validate_dataframe(df: pd.DataFrame, rules: Dict[str, Any]) -> Dict[str, Any]:
