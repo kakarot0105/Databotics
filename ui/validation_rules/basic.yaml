@@ -1,0 +1,10 @@
+columns:
+  name:
+    required: true
+    type: str
+  age:
+    type: int
+    min: 0
+    max: 120
+  email:
+    regex: ".+@.+\..+"

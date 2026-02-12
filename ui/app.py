@@ -69,6 +69,21 @@ with st.container():
             st.success("Sample data loaded into workspace as `sample_data`")
         except Exception as e:
             st.error(f"Failed to load sample: {e}")
+    if st.button("Run Validation (local)"):
+        # Run a quick validation using the local rules file
+        try:
+            if "sample_data" in st.session_state.get("dataframes_cache", {}):
+                dfv = st.session_state["dataframes_cache"]["sample_data"]
+            else:
+                sample_path = (BASE_DIR.parent / "test_data.csv")
+                dfv = pd.read_csv(sample_path)
+            from app.validation import load_rules, validate_dataframe
+            rules = load_rules(str(BASE_DIR / "validation_rules" / "basic.yaml"))
+            report = validate_dataframe(dfv, rules)
+            st.session_state["last_validation"] = report
+            st.success("Validation complete. Open Results panel to view details.")
+        except Exception as e:
+            st.error(f"Validation failed: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Sidebar quick settings
