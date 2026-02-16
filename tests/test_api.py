@@ -1,6 +1,5 @@
 """Tests for all FastAPI endpoints."""
 import io
-import pytest
 from fastapi.testclient import TestClient
 from app.api import app
 
@@ -14,11 +13,50 @@ def _upload(data: bytes, filename: str = "test.csv", content_type: str = "text/c
     return ("file", (filename, io.BytesIO(data), content_type))
 
 
+def _auth_headers() -> dict[str, str]:
+    username = "testuser"
+    password = "testpass"
+    reg = client.post("/auth/register", json={"username": username, "password": password})
+    if reg.status_code not in (200, 400):
+        raise AssertionError(f"Unexpected register status: {reg.status_code}")
+
+    login = client.post("/auth/login", json={"username": username, "password": password})
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+AUTH_HEADERS = _auth_headers()
+
+
+def test_register_and_login():
+    username = "newuser"
+    password = "newpass"
+    reg = client.post("/auth/register", json={"username": username, "password": password})
+    assert reg.status_code == 200
+    assert "access_token" in reg.json()
+
+    login = client.post("/auth/login", json={"username": username, "password": password})
+    assert login.status_code == 200
+    assert "access_token" in login.json()
+
+
+def test_protected_endpoint_without_token():
+    resp = client.post("/profile", files=[_upload(SAMPLE_CSV)])
+    assert resp.status_code in (401, 403)
+
+
+def test_upload_size_limit():
+    too_big = b"a" * (52_428_800 + 1)
+    resp = client.post("/upload", files=[_upload(too_big, "huge.csv")], headers=AUTH_HEADERS)
+    assert resp.status_code == 413
+
+
 # ---- /profile ----
 
 class TestProfile:
     def test_profile_csv(self):
-        resp = client.post("/profile", files=[_upload(SAMPLE_CSV)])
+        resp = client.post("/profile", files=[_upload(SAMPLE_CSV)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert body["row_count"] == 3
@@ -29,13 +67,13 @@ class TestProfile:
         assert "email" in col_names
 
     def test_profile_returns_sample_rows(self):
-        resp = client.post("/profile", files=[_upload(SAMPLE_CSV)])
+        resp = client.post("/profile", files=[_upload(SAMPLE_CSV)], headers=AUTH_HEADERS)
         body = resp.json()
         assert len(body["sample_rows"]) == 3
         assert body["sample_rows"][0]["name"] == "Alice"
 
     def test_profile_numeric_stats(self):
-        resp = client.post("/profile", files=[_upload(SAMPLE_CSV)])
+        resp = client.post("/profile", files=[_upload(SAMPLE_CSV)], headers=AUTH_HEADERS)
         body = resp.json()
         age_col = [c for c in body["columns"] if c["name"] == "age"][0]
         assert age_col["stats"] is not None
@@ -43,7 +81,7 @@ class TestProfile:
         assert age_col["stats"]["max"] == 30.0
 
     def test_profile_empty_file(self):
-        resp = client.post("/profile", files=[_upload(b"", "empty.csv", "text/csv")])
+        resp = client.post("/profile", files=[_upload(b"", "empty.csv", "text/csv")], headers=AUTH_HEADERS)
         assert resp.status_code == 400
 
 
@@ -51,7 +89,7 @@ class TestProfile:
 
 class TestValidate:
     def test_validate_finds_violations(self):
-        resp = client.post("/validate", files=[_upload(SAMPLE_CSV)])
+        resp = client.post("/validate", files=[_upload(SAMPLE_CSV)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert "violations" in body
@@ -61,14 +99,14 @@ class TestValidate:
 
     def test_validate_clean_data(self):
         clean = b"name,age,email\nAlice,30,a@example.com\nBob,25,b@example.com\n"
-        resp = client.post("/validate", files=[_upload(clean)])
+        resp = client.post("/validate", files=[_upload(clean)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["violations"]) == 0
 
     def test_validate_missing_required_column(self):
         no_name = b"age,email\n30,a@example.com\n"
-        resp = client.post("/validate", files=[_upload(no_name)])
+        resp = client.post("/validate", files=[_upload(no_name)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         msgs = [v["message"] for v in body["violations"]]
@@ -80,18 +118,18 @@ class TestValidate:
 class TestClean:
     def test_clean_trim(self):
         messy = b"name,age\n  Alice  ,30\n Bob ,25\n"
-        resp = client.post("/clean?trim_strings=true&drop_duplicates=false", files=[_upload(messy)])
+        resp = client.post("/clean?trim_strings=true&drop_duplicates=false", files=[_upload(messy)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
         # Should return a file (CSV or parquet)
         assert len(resp.content) > 0
 
     def test_clean_dedup(self):
         duped = b"name,age\nAlice,30\nAlice,30\nBob,25\n"
-        resp = client.post("/clean?trim_strings=false&drop_duplicates=true", files=[_upload(duped)])
+        resp = client.post("/clean?trim_strings=false&drop_duplicates=true", files=[_upload(duped)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
 
     def test_clean_normalize_lower(self):
-        resp = client.post("/clean?trim_strings=false&drop_duplicates=false&normalize_case=lower", files=[_upload(SAMPLE_CSV)])
+        resp = client.post("/clean?trim_strings=false&drop_duplicates=false&normalize_case=lower", files=[_upload(SAMPLE_CSV)], headers=AUTH_HEADERS)
         assert resp.status_code == 200
 
 
@@ -104,7 +142,7 @@ class TestGenerateSQL:
             "question": "Show all users",
             "table": "users",
             "schema": {"name": "str", "age": "int"},
-        })
+        }, headers=AUTH_HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert "sql" in body
@@ -118,7 +156,7 @@ class TestGenerateSQL:
             "table": "users",
             "schema": {"name": "str", "age": "int"},
             "sample_rows": [{"name": "Alice", "age": 30}],
-        })
+        }, headers=AUTH_HEADERS)
         assert resp.status_code == 200
 
 
@@ -129,6 +167,7 @@ class TestAnalyze:
         resp = client.post(
             "/analyze?timestamp_col=timestamp&metric_col=value",
             files=[_upload(TS_CSV)],
+            headers=AUTH_HEADERS,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -142,6 +181,7 @@ class TestAnalyze:
         resp = client.post(
             "/analyze?timestamp_col=timestamp&metric_col=value",
             files=[_upload(big_outlier_csv)],
+            headers=AUTH_HEADERS,
         )
         body = resp.json()
         assert body["summary"]["count"] >= 1
@@ -156,6 +196,7 @@ class TestQuery:
         resp = client.post(
             "/query?sql=SELECT+*+FROM+loaded_table+LIMIT+2",
             files=[_upload(SAMPLE_CSV)],
+            headers=AUTH_HEADERS,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -166,6 +207,7 @@ class TestQuery:
         resp = client.post(
             "/query?sql=SELECT+COUNT(*)+as+cnt+FROM+loaded_table",
             files=[_upload(SAMPLE_CSV)],
+            headers=AUTH_HEADERS,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -175,5 +217,6 @@ class TestQuery:
         resp = client.post(
             "/query?sql=INVALID+SQL+GARBAGE",
             files=[_upload(SAMPLE_CSV)],
+            headers=AUTH_HEADERS,
         )
         assert resp.status_code == 400

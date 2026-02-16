@@ -1,3 +1,5 @@
+import { getToken } from "./auth";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export interface ColumnStats {
@@ -69,8 +71,24 @@ export interface CleanOptions {
   drop_duplicates: boolean;
 }
 
+function withAuthHeaders(init?: RequestInit): RequestInit {
+  const token = getToken();
+  const headers = new Headers(init?.headers ?? {});
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return { ...init, headers };
+}
+
+function handleUnauthorized(response: Response) {
+  if (response.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
+
 async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
+  const response = await fetch(input, withAuthHeaders(init));
+  handleUnauthorized(response);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `Request failed: ${response.status}`);
@@ -139,11 +157,15 @@ export async function cleanFile(file: File, options: CleanOptions): Promise<Blob
     params.set("normalize_case", options.normalize_case);
   }
 
-  const response = await fetch(`${API_BASE_URL}/clean?${params.toString()}`, {
-    method: "POST",
-    body: formData,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/clean?${params.toString()}`,
+    withAuthHeaders({
+      method: "POST",
+      body: formData,
+    }),
+  );
 
+  handleUnauthorized(response);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `Request failed: ${response.status}`);

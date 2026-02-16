@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -8,6 +8,15 @@ from .validation import load_rules, validate_dataframe
 import io
 import json
 import math
+from .auth import (
+    User,
+    UserCredentials,
+    Token,
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+    register_user,
+)
 
 app = FastAPI(title="Databotics API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -19,6 +28,7 @@ from pathlib import Path as _Path
 UPLOAD_DIR = _Path(tempfile.gettempdir()) / "databotics_uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 _sessions: Dict[str, _Path] = {}
+MAX_UPLOAD_SIZE = 52_428_800  # 50MB
 
 # ---- Pydantic models ----
 class ColumnStats(BaseModel):
@@ -80,10 +90,32 @@ def _get_session_df(session_id: str) -> pd.DataFrame:
         raise HTTPException(status_code=404, detail="Session not found. Upload a file first.")
     return _read_table_from_upload(path.read_bytes())
 
+
+def enforce_upload_size(request: Request):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Upload too large. Max size is 50MB.")
+
+
 # ---- Endpoints ----
 
+@app.post('/auth/register', response_model=Token)
+async def register(creds: UserCredentials):
+    user = register_user(creds.username, creds.password)
+    token = create_access_token({"sub": user.username})
+    return Token(access_token=token)
+
+
+@app.post('/auth/login', response_model=Token)
+async def login(creds: UserCredentials):
+    user = authenticate_user(creds.username, creds.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = create_access_token({"sub": user.username})
+    return Token(access_token=token)
+
 @app.post('/upload')
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), _: User = Depends(get_current_user), __: None = Depends(enforce_upload_size)):
     """Store file server-side, return session_id for subsequent calls."""
     session_id = uuid.uuid4().hex
     dest = UPLOAD_DIR / f"{session_id}_{file.filename}"
@@ -94,7 +126,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @app.get('/session/{session_id}')
-async def get_session(session_id: str):
+async def get_session(session_id: str, _: User = Depends(get_current_user)):
     path = _sessions.get(session_id)
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail="Session not found")
@@ -102,7 +134,7 @@ async def get_session(session_id: str):
 
 
 @app.post('/profile/{session_id}', response_model=ProfileResponse)
-async def profile_by_session(session_id: str):
+async def profile_by_session(session_id: str, _: User = Depends(get_current_user)):
     """Profile a previously uploaded file by session_id."""
     df = _get_session_df(session_id)
     cols = []
@@ -123,7 +155,7 @@ async def profile_by_session(session_id: str):
 
 
 @app.post('/profile', response_model=ProfileResponse)
-async def profile(file: UploadFile = File(...)):
+async def profile(file: UploadFile = File(...), _: User = Depends(get_current_user), __: None = Depends(enforce_upload_size)):
     contents = await file.read()
     df = _read_table_from_upload(contents)
     cols = []
@@ -143,7 +175,7 @@ async def profile(file: UploadFile = File(...)):
     return ProfileResponse(dataset_id=None, filename=file.filename, row_count=len(df), columns=cols, sample_rows=sample)
 
 @app.post('/validate', response_model=ValidateResponse)
-async def validate(file: UploadFile = File(...), rules_path: str = 'ui/validation_rules/basic.yaml'):
+async def validate(file: UploadFile = File(...), rules_path: str = 'ui/validation_rules/basic.yaml', _: User = Depends(get_current_user), __: None = Depends(enforce_upload_size)):
     contents = await file.read()
     df = _read_table_from_upload(contents)
     rules = load_rules(rules_path)
@@ -152,7 +184,7 @@ async def validate(file: UploadFile = File(...), rules_path: str = 'ui/validatio
     return ValidateResponse(dataset_id=None, ruleset_id=None, summary=report.get('summary', {}), violations=report.get('errors', []))
 
 @app.post('/clean')
-async def clean(file: UploadFile = File(...), trim_strings: bool = True, normalize_case: Optional[str] = None, drop_duplicates: bool = False):
+async def clean(file: UploadFile = File(...), trim_strings: bool = True, normalize_case: Optional[str] = None, drop_duplicates: bool = False, _: User = Depends(get_current_user), __: None = Depends(enforce_upload_size)):
     contents = await file.read()
     df = _read_table_from_upload(contents)
     before = len(df)
@@ -184,7 +216,7 @@ async def clean(file: UploadFile = File(...), trim_strings: bool = True, normali
         return StreamingResponse(io.BytesIO(buf.getvalue().encode('utf-8')), media_type='text/csv', headers={'Content-Disposition':'attachment; filename="cleaned.csv"'})
 
 @app.post('/generate_sql', response_model=GenerateSQLResponse)
-async def generate_sql(req: GenerateSQLRequest):
+async def generate_sql(req: GenerateSQLRequest, _: User = Depends(get_current_user)):
     # deterministic fallback when no OPENAI_API_KEY
     import os
     key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
@@ -208,6 +240,8 @@ async def generate_sql(req: GenerateSQLRequest):
 @app.post('/analyze', response_model=AnalyzeResponse)
 async def analyze(
     file: UploadFile = File(...),
+    _: User = Depends(get_current_user),
+    __: None = Depends(enforce_upload_size),
     timestamp_col: str = "timestamp",
     metric_col: str = "value",
     dimension_cols: Optional[str] = None,
@@ -230,7 +264,7 @@ async def analyze(
     return AnalyzeResponse(anomalies=anomalies, summary={'count': len(anomalies), 'method_used': 'zscore'}, narrative=narrative)
 
 @app.post('/query')
-async def query(file: UploadFile = File(...), sql: str = ''):
+async def query(file: UploadFile = File(...), sql: str = '', _: User = Depends(get_current_user), __: None = Depends(enforce_upload_size)):
     contents = await file.read()
     df = _read_table_from_upload(contents)
     try:

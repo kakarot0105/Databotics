@@ -7,6 +7,10 @@ duckdb
 requests
 snowflake-connector-python
 pydantic
+python-multipart
+pyjwt
+passlib[bcrypt]
+bcrypt<4
 
 openai<1
 psycopg2-binary
