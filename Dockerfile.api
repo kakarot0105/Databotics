@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+WORKDIR /app
+
+COPY requirements.txt requirements-optional.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir python-multipart uvicorn[standard]
+
+COPY app/ ./app/
+COPY connectors/ ./connectors/
+COPY ui/validation_rules/ ./ui/validation_rules/
+COPY test_data.csv ./
+
+EXPOSE 8000
+CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]

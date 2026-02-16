@@ -78,6 +78,27 @@ async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promi
   return response.json() as Promise<T>;
 }
 
+export interface UploadResponse {
+  session_id: string;
+  filename: string;
+  size: number;
+}
+
+export async function uploadFile(file: File): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return fetchJson<UploadResponse>(`${API_BASE_URL}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function profileBySession(sessionId: string): Promise<ProfileResponse> {
+  return fetchJson<ProfileResponse>(`${API_BASE_URL}/profile/${sessionId}`, {
+    method: "POST",
+  });
+}
+
 export async function profileFile(file: File): Promise<ProfileResponse> {
   const formData = new FormData();
   formData.append("file", file);
@@ -134,9 +155,14 @@ export async function cleanFile(file: File, options: CleanOptions): Promise<Blob
 export async function analyzeFile(file: File, payload: AnalyzeRequest): Promise<AnalyzeResponse> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("payload", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  const params = new URLSearchParams({
+    timestamp_col: payload.timestamp_col,
+    metric_col: payload.metric_col,
+  });
+  if (payload.method) params.set("method", payload.method);
+  if (payload.dimension_cols?.length) params.set("dimension_cols", payload.dimension_cols.join(","));
 
-  return fetchJson<AnalyzeResponse>(`${API_BASE_URL}/analyze`, {
+  return fetchJson<AnalyzeResponse>(`${API_BASE_URL}/analyze?${params.toString()}`, {
     method: "POST",
     body: formData,
   });

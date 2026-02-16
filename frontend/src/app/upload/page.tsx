@@ -3,13 +3,12 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAppStore } from "@/lib/store";
-import { profileFile } from "@/lib/api";
+import { uploadFile, profileBySession } from "@/lib/api";
 
 export default function UploadPage() {
-  const { setUploadedFile, setProfile } = useAppStore();
+  const { setUploadedFile, setProfile, setSessionId } = useAppStore();
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +22,11 @@ export default function UploadPage() {
       setUploadedFile(file);
       setLoading(true);
       try {
-        const prof = await profileFile(file);
+        // Upload to server for session persistence
+        const upload = await uploadFile(file);
+        setSessionId(upload.session_id);
+        // Profile using session
+        const prof = await profileBySession(upload.session_id);
         setProfile(prof);
         router.push("/profile");
       } catch (e: unknown) {
@@ -32,7 +35,7 @@ export default function UploadPage() {
         setLoading(false);
       }
     },
-    [setUploadedFile, setProfile, router],
+    [setUploadedFile, setProfile, setSessionId, router],
   );
 
   return (
@@ -44,10 +47,7 @@ export default function UploadPage() {
         </CardHeader>
         <CardContent>
           <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => {
               e.preventDefault();
@@ -70,7 +70,7 @@ export default function UploadPage() {
             }}
           >
             <p className="text-lg text-slate-600">
-              {loading ? "Profiling…" : fileName ? `Selected: ${fileName}` : "Drop CSV / XLSX here or click to browse"}
+              {loading ? "Uploading & profiling…" : fileName ? `Selected: ${fileName}` : "Drop CSV / XLSX here or click to browse"}
             </p>
           </div>
           {error && (

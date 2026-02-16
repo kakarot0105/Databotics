@@ -12,8 +12,13 @@ import math
 app = FastAPI(title="Databotics API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-from fastapi.middleware.cors import CORSMiddleware
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# ---- Server-side file session storage ----
+import tempfile, uuid
+from pathlib import Path as _Path
+
+UPLOAD_DIR = _Path(tempfile.gettempdir()) / "databotics_uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+_sessions: Dict[str, _Path] = {}
 
 # ---- Pydantic models ----
 class ColumnStats(BaseModel):
@@ -69,7 +74,54 @@ def _read_table_from_upload(contents: bytes) -> pd.DataFrame:
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+def _get_session_df(session_id: str) -> pd.DataFrame:
+    path = _sessions.get(session_id)
+    if not path or not path.exists():
+        raise HTTPException(status_code=404, detail="Session not found. Upload a file first.")
+    return _read_table_from_upload(path.read_bytes())
+
 # ---- Endpoints ----
+
+@app.post('/upload')
+async def upload_file(file: UploadFile = File(...)):
+    """Store file server-side, return session_id for subsequent calls."""
+    session_id = uuid.uuid4().hex
+    dest = UPLOAD_DIR / f"{session_id}_{file.filename}"
+    contents = await file.read()
+    dest.write_bytes(contents)
+    _sessions[session_id] = dest
+    return {"session_id": session_id, "filename": file.filename, "size": len(contents)}
+
+
+@app.get('/session/{session_id}')
+async def get_session(session_id: str):
+    path = _sessions.get(session_id)
+    if not path or not path.exists():
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session_id": session_id, "filename": path.name, "size": path.stat().st_size}
+
+
+@app.post('/profile/{session_id}', response_model=ProfileResponse)
+async def profile_by_session(session_id: str):
+    """Profile a previously uploaded file by session_id."""
+    df = _get_session_df(session_id)
+    cols = []
+    for c in df.columns:
+        null_count = int(df[c].isnull().sum())
+        null_pct = float(null_count) / max(1, len(df))
+        stats = None
+        if pd.api.types.is_numeric_dtype(df[c]):
+            stats = {
+                'min': float(df[c].min()),
+                'max': float(df[c].max()),
+                'mean': float(df[c].mean()) if not math.isnan(df[c].mean()) else None,
+                'std': float(df[c].std()) if not math.isnan(df[c].std()) else None,
+            }
+        cols.append(ColumnStats(name=str(c), type=str(df[c].dtype), null_count=null_count, null_pct=null_pct, stats=stats))
+    sample = df.head(20).to_dict(orient='records')
+    return ProfileResponse(dataset_id=session_id, filename=path.name if (path := _sessions.get(session_id)) else None, row_count=len(df), columns=cols, sample_rows=sample)
+
+
 @app.post('/profile', response_model=ProfileResponse)
 async def profile(file: UploadFile = File(...)):
     contents = await file.read()
@@ -154,13 +206,18 @@ async def generate_sql(req: GenerateSQLRequest):
         return GenerateSQLResponse(sql=sql, explanation='Fallback deterministic SQL due to LLM error', safety={'is_safe': True, 'reasons': []})
 
 @app.post('/analyze', response_model=AnalyzeResponse)
-async def analyze(file: UploadFile = File(...), payload: AnalyzeRequest = None):
+async def analyze(
+    file: UploadFile = File(...),
+    timestamp_col: str = "timestamp",
+    metric_col: str = "value",
+    dimension_cols: Optional[str] = None,
+    method: Optional[str] = "simple",
+):
     contents = await file.read()
     df = _read_table_from_upload(contents)
-    req = payload
     # simple fallback z-score detection
-    ts = pd.to_datetime(df[req.timestamp_col])
-    vals = pd.to_numeric(df[req.metric_col], errors='coerce')
+    ts = pd.to_datetime(df[timestamp_col])
+    vals = pd.to_numeric(df[metric_col], errors='coerce')
     mean = vals.mean()
     std = vals.std()
     anomalies = []
