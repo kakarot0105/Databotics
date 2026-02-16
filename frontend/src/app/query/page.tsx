@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { toast } from "sonner";
 
 export default function QueryPage() {
   const { uploadedFile } = useAppStore();
@@ -27,7 +28,9 @@ export default function QueryPage() {
       const res = await queryFile(uploadedFile, sql);
       setResult(res);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Query failed");
+      const message = e instanceof Error ? e.message : "Query failed";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -52,10 +55,17 @@ export default function QueryPage() {
           />
           <Button onClick={run} disabled={loading}>{loading ? "Running…" : "Run SQL"}</Button>
           {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-9 rounded bg-slate-100 dark:bg-slate-900" />
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      {result && (
+      {result && !loading && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

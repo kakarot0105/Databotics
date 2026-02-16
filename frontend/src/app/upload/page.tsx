@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAppStore } from "@/lib/store";
 import { uploadFile, profileBySession } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function UploadPage() {
   const { setUploadedFile, setProfile, setSessionId } = useAppStore();
@@ -22,15 +23,16 @@ export default function UploadPage() {
       setUploadedFile(file);
       setLoading(true);
       try {
-        // Upload to server for session persistence
         const upload = await uploadFile(file);
         setSessionId(upload.session_id);
-        // Profile using session
         const prof = await profileBySession(upload.session_id);
         setProfile(prof);
+        toast.success("Upload complete. Profile ready.");
         router.push("/profile");
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Upload failed");
+        const message = e instanceof Error ? e.message : "Upload failed";
+        setError(message);
+        toast.error(message);
       } finally {
         setLoading(false);
       }
@@ -39,7 +41,7 @@ export default function UploadPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto w-full max-w-2xl space-y-6">
       <h2 className="text-2xl font-bold">Upload Dataset</h2>
       <Card>
         <CardHeader>
@@ -55,8 +57,8 @@ export default function UploadPage() {
               const f = e.dataTransfer.files[0];
               if (f) handleFile(f);
             }}
-            className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition ${
-              dragOver ? "border-blue-500 bg-blue-50" : "border-slate-300"
+            className={`flex min-h-[200px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center transition ${
+              dragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" : "border-slate-300 dark:border-slate-700"
             }`}
             onClick={() => {
               const input = document.createElement("input");
@@ -69,7 +71,7 @@ export default function UploadPage() {
               input.click();
             }}
           >
-            <p className="text-lg text-slate-600">
+            <p className="text-lg text-slate-600 dark:text-slate-300">
               {loading ? "Uploading & profiling…" : fileName ? `Selected: ${fileName}` : "Drop CSV / XLSX here or click to browse"}
             </p>
           </div>

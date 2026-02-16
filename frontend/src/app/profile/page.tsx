@@ -13,8 +13,30 @@ import {
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+function ProfileSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="h-8 w-48 rounded bg-slate-200 dark:bg-slate-800" />
+      <Card>
+        <CardHeader>
+          <div className="h-6 w-44 rounded bg-slate-200 dark:bg-slate-800" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-10 rounded bg-slate-100 dark:bg-slate-900" />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
-  const { profile, uploadedFile } = useAppStore();
+  const { profile, uploadedFile, hydrated } = useAppStore();
+
+  if (!hydrated) {
+    return <ProfileSkeleton />;
+  }
 
   if (!profile) {
     return (
@@ -26,7 +48,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <h2 className="text-2xl font-bold">Profile</h2>
         {uploadedFile && <Badge variant="secondary">{uploadedFile.name}</Badge>}
         <Badge>{profile.row_count.toLocaleString()} rows</Badge>
@@ -36,7 +58,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle>Column Statistics</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

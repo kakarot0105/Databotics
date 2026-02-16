@@ -1,7 +1,5 @@
 fastapi
 uvicorn[standard]
-streamlit
-plotly
 pandas
 duckdb
 requests
@@ -11,7 +9,5 @@ python-multipart
 pyjwt
 passlib[bcrypt]
 bcrypt<4
-
-openai<1
 psycopg2-binary
 pymysql

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { ProfileResponse, ValidateResponse } from "@/lib/api";
 
 interface AppStore {
+  hydrated: boolean;
   sessionId: string | null;
   uploadedFile: File | null;
   profile: ProfileResponse | null;
@@ -17,19 +18,22 @@ interface AppStore {
 const AppStoreContext = createContext<AppStore | undefined>(undefined);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
+  const [hydrated, setHydrated] = useState(false);
   const [sessionId, setSessionIdRaw] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [validation, setValidation] = useState<ValidateResponse | null>(null);
 
-  // Restore sessionId from sessionStorage on mount
   useEffect(() => {
     const stored = sessionStorage.getItem("databotics_session_id");
     if (stored) setSessionIdRaw(stored);
     const storedProfile = sessionStorage.getItem("databotics_profile");
     if (storedProfile) {
-      try { setProfile(JSON.parse(storedProfile)); } catch {}
+      try {
+        setProfile(JSON.parse(storedProfile));
+      } catch {}
     }
+    setHydrated(true);
   }, []);
 
   const setSessionId = (id: string | null) => {
@@ -46,6 +50,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
+      hydrated,
       sessionId,
       uploadedFile,
       profile,
@@ -56,7 +61,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setValidation,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessionId, uploadedFile, profile, validation],
+    [hydrated, sessionId, uploadedFile, profile, validation],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
