@@ -1,0 +1,17 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { DashboardWidget } from "@/lib/api";
+
+export interface WidgetConfigState {
+  title?: string;
+  xKey?: string;
+  yKey?: string;
+  labelKey?: string;
+  valueKey?: string;
+  color?: string;
+  showLegend?: boolean;
+  trend?: number;\n  query?: string;\n  [key: string]: any;\n}\n\ninterface WidgetConfigProps {\n  widget: DashboardWidget;\n  onSave: (config: WidgetConfigState) => void;\n  onCancel: () => void;\n}\n\nexport function WidgetConfig({ widget, onSave, onCancel }: WidgetConfigProps) {\n  const [draft, setDraft] = useState<WidgetConfigState>(widget.config || {});\n\n  useEffect(() => {\n    setDraft(widget.config || {});\n  }, [widget.config]);\n\n  const handleChange = (key: string, value: any) => {\n    setDraft((prev) => ({ ...prev, [key]: value }));\n  };\n\n  return (\n    <div className="space-y-4">\n      <div>\n        <label className="text-xs text-muted-foreground">Widget Title</label>\n        <Input\n          value={draft.title || \"\"}\n          onChange={(e) => handleChange(\"title\", e.target.value)}\n          placeholder="Widget title"\n          className="mt-1"\n        />\n      </div>\n\n      <div>\n        <label className="text-xs text-muted-foreground">SQL Query</label>\n        <textarea\n          value={draft.query || \"\"}\n          onChange={(e) => handleChange(\"query\", e.target.value)}\n          placeholder="SELECT * FROM table"\n          className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-foreground placeholder-muted-foreground"\n          rows={4}\n        />\n      </div>\n\n      <div className="grid grid-cols-2 gap-3">\n        <div>\n          <label className="text-xs text-muted-foreground\">X Axis</label>\n          <Input\n            value={draft.xKey || \"\"}\n            onChange={(e) => handleChange(\"xKey\", e.target.value)}\n            placeholder="Column name\"\n            className=\"mt-1\"\n          />\n        </div>\n        <div>\n          <label className=\"text-xs text-muted-foreground\">Y Axis</label>\n          <Input\n            value={draft.yKey || \"\"}\n            onChange={(e) => handleChange(\"yKey\", e.target.value)}\n            placeholder=\"Column name\"\n            className=\"mt-1\"\n          />\n        </div>\n      </div>\n\n      <div>\n        <label className=\"text-xs text-muted-foreground\">Color</label>\n        <div className=\"mt-1 flex gap-2\">\n          <input\n            type=\"color\"\n            value={draft.color || \"#6366f1\"}\n            onChange={(e) => handleChange(\"color\", e.target.value)}\n            className=\"h-10 w-12 cursor-pointer rounded-lg border border-white/10\"\n          />\n          <Input\n            value={draft.color || \"#6366f1\"}\n            onChange={(e) => handleChange(\"color\", e.target.value)}\n            className=\"flex-1\"\n          />\n        </div>\n      </div>\n\n      <div className=\"flex gap-2 pt-4\">\n        <Button size=\"sm\" onClick={() => onSave(draft)} className=\"flex-1\">\n          Save\n        </Button>\n        <Button size=\"sm\" variant=\"ghost\" onClick={onCancel} className=\"flex-1\">\n          Cancel\n        </Button>\n      </div>\n    </div>\n  );\n}\n"
+          

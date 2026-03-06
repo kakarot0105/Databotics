@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+pandas
+duckdb
+requests
+snowflake-connector-python
+pydantic
+python-multipart
+pyjwt
+passlib[bcrypt]
+bcrypt<4
+psycopg2-binary
+pymysql
+scikit-learn
+gspread
+google-auth
