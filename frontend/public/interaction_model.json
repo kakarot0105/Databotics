@@ -1,0 +1,88 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "open claw",
+      "intents": [
+        {
+          "name": "RunCommandIntent",
+          "slots": [
+            {
+              "name": "command",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "run {command}",
+            "execute {command}",
+            "do {command}",
+            "{command}",
+            "tell my computer to {command}",
+            "make my computer {command}",
+            "can you {command}",
+            "please {command}"
+          ]
+        },
+        {
+          "name": "CheckStocksIntent",
+          "slots": [],
+          "samples": [
+            "check my stocks",
+            "check stocks",
+            "how are my stocks",
+            "stock update",
+            "portfolio update",
+            "check my portfolio",
+            "how is my portfolio",
+            "what's my portfolio value",
+            "stock check",
+            "market update"
+          ]
+        },
+        {
+          "name": "TakeScreenshotIntent",
+          "slots": [],
+          "samples": [
+            "take a screenshot",
+            "screenshot",
+            "capture screen",
+            "take screenshot",
+            "screen capture",
+            "snap the screen"
+          ]
+        },
+        {
+          "name": "OpenAppIntent",
+          "slots": [
+            {
+              "name": "app_name",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "open {app_name}",
+            "launch {app_name}",
+            "start {app_name}",
+            "run {app_name}",
+            "fire up {app_name}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        }
+      ]
+    }
+  }
+}

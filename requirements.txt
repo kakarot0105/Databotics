@@ -11,6 +11,10 @@ passlib[bcrypt]
 bcrypt<4
 psycopg2-binary
 pymysql
+aiosqlite
 scikit-learn
 gspread
 google-auth
+transformers
+torch
+accelerate

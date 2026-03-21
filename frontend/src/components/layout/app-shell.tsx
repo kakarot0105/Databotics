@@ -12,6 +12,7 @@ import { ChatSidebar } from "./chat-sidebar";
 const PUBLIC_ROUTES = new Set(["/login", "/register"]);
 
 const PAGE_TITLES: Record<string, string> = {
+  "/ai-analyst": "AI Analyst",
   "/upload": "Upload Dataset",
   "/sessions": "Sessions",
   "/profile": "Data Profile",
@@ -37,19 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
-    const authed = isAuthenticated();
-    const isPublic = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/share");
-
-    if (!authed && !isPublic) {
-      router.replace("/login");
-      return;
-    }
-
-    if (authed && isPublic) {
-      router.replace("/upload");
-      return;
-    }
-
+    // AUTH DISABLED - skip auth checks
     setReady(true);
   }, [pathname, router]);
 

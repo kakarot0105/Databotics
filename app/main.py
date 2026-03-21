@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Body, Form
 import pandas as pd
+from backend.api.auto_ml import router as auto_ml_router
 from io import BytesIO
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ except Exception:
     pc = None  # gracefully degrade if not installed
 
 app = FastAPI(title="Databotics")
+app.include_router(auto_ml_router)
 
 class ValidateRequest(BaseModel):
     rules: Dict[str, Any] = {}

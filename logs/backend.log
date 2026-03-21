@@ -1,0 +1,55 @@
+/Users/bulmanik/clawd/Databotics/app/api.py:125: UserWarning: Field name "schema" in "GenerateSQLRequest" shadows an attribute in parent "BaseModel"
+  class GenerateSQLRequest(BaseModel):
+INFO:     Started server process [56864]
+INFO:     Waiting for application startup.
+ERROR:    Traceback (most recent call last):
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/starlette/routing.py", line 694, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/fastapi/routing.py", line 212, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/fastapi/routing.py", line 212, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/fastapi/routing.py", line 212, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/fastapi/routing.py", line 212, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/fastapi/routing.py", line 237, in __aenter__
+    await self._router._startup()
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/fastapi/routing.py", line 4880, in _startup
+    await handler()
+  File "/Users/bulmanik/clawd/Databotics/app/api.py", line 92, in _startup_streaming
+    await init_streaming()
+  File "/Users/bulmanik/clawd/Databotics/backend/api/streaming.py", line 409, in init_streaming
+    sources = await _list_sources()
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/api/streaming.py", line 420, in _list_sources
+    async with await _get_db() as db:
+               ^^^^^^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/aiosqlite/core.py", line 181, in __aenter__
+    return await self
+           ^^^^^^^^^^
+  File "/Users/bulmanik/clawd/Databotics/backend/.venv/lib/python3.14/site-packages/aiosqlite/core.py", line 177, in __await__
+    self._thread.start()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/threading.py", line 989, in start
+    raise RuntimeError("threads can only be started once")
+RuntimeError: threads can only be started once
+
+ERROR:    Application startup failed. Exiting.

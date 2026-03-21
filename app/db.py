@@ -4,7 +4,27 @@ from pathlib import Path
 from typing import Optional
 import os
 
+# SQLAlchemy for ORM support
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, JSON, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session, relationship
+
+Base = declarative_base()
+
+# SQLAlchemy engine
 DB_PATH = Path(os.getenv("DATABOTICS_DB", "/tmp/databotics.db"))
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    """Get SQLAlchemy database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def get_connection():
@@ -16,6 +36,9 @@ def get_connection():
 
 def init_db():
     """Initialize database schema."""
+    # Create SQLAlchemy tables
+    Base.metadata.create_all(bind=engine)
+    
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""

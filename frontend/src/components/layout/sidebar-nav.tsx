@@ -15,6 +15,8 @@ import {
   FolderOpen,
   LayoutDashboard,
   MessageSquare,
+  Cpu,
+  Activity,
 } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { ThemeToggle } from "./theme-toggle";
@@ -29,16 +31,19 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { href: "/ai-analyst", label: "AI Analyst", icon: Sparkles, group: "pipeline" },
   { href: "/upload", label: "Upload", icon: Upload, group: "pipeline" },
   { href: "/sessions", label: "Sessions", icon: FolderOpen, group: "pipeline" },
   { href: "/profile", label: "Profile", icon: BarChart3, group: "pipeline" },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "pipeline" },
   { href: "/dashboards", label: "Dashboards", icon: LayoutDashboard, group: "pipeline" },
+  { href: "/streaming", label: "Live Stream", icon: Activity, group: "pipeline" },
   { href: "/validate", label: "Validate", icon: ShieldCheck, group: "pipeline" },
   { href: "/clean", label: "Clean", icon: Sparkles, group: "pipeline" },
   { href: "/data-cleaning", label: "Data Cleaning", icon: Sparkles, group: "pipeline" },
   { href: "/query", label: "Query", icon: Database, group: "intelligence" },
   { href: "/nl-query", label: "Ask AI", icon: MessageSquare, group: "intelligence" },
+  { href: "/auto-ml", label: "Auto-ML", icon: Cpu, group: "intelligence" },
   { href: "/anomaly", label: "Anomaly Detection", icon: AlertTriangle, group: "intelligence" },
   { href: "/insights", label: "AI Insights", icon: Sparkles, group: "intelligence" },
   { href: "/notifications", label: "Notifications", icon: Bell, group: "intelligence" },
